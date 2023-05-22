@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^20.2.0",
+    "puppeteer": "^20.3.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
