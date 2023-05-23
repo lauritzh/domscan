@@ -37,7 +37,12 @@ const argv = yargs
   })
   .option('guessParameters', {
     alias: 'g',
-    describe: 'Enable parameter guessing',
+    describe: 'Enable parameter guessing based on URLSearchParams',
+    type: 'boolean'
+  })
+  .option('guessParametersExtended', {
+    alias: 'G',
+    describe: 'Enable extended parameter guessing based on variable definition in JS code and wordlist',
     type: 'boolean'
   })
   .option('userAgent', {
@@ -55,9 +60,13 @@ const argv = yargs
     describe: 'Specify HTTP proxy (also disables certificate validation)',
     type: 'string'
   })
-  .option('cookies', {
+  .option('cookie', {
     alias: 'c',
     describe: 'Specify cookies (multiple values allowed)',
+    array: true
+  })
+  .option('excludedParameter', {
+    describe: 'Exclude parameter from scan (multiple values allowed)',
     array: true
   })
   .option('localStorage', {
@@ -140,7 +149,7 @@ async function initialPageLoad (page) {
   if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load Complete')
 }
 
-async function guessParameters (page) {
+async function guessParametersExtended (page) {
   // TODO: Implement parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
   // 1. Read parameter names from wordlist
   let parametersFromWordlist
@@ -162,7 +171,7 @@ async function guessParameters (page) {
         while ((match = regex.exec(scriptContent)) !== null) {
           inlineJsVariableAssignments.push(match[2])
         }
-      } else {
+      } else if (new URL(script.src).hostname === window.location.hostname) { // Only fetch scripts from same origin
         try {
           const response = await fetch(script.src)
           const scriptContent = await response.text()
@@ -233,7 +242,7 @@ async function registerAnalysisListeners (page, client) {
   }).on('requestfailed', request => {
     if (argv.verbose) printColorful('turquoise', `[+] Request Failed: ${request.url()}`)
     if (initialPageLoadRequestfailed.includes(request) === false) {
-      printColorful('yellow', `  [+] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
+      if (argv.verbose) printColorful('yellow', `  [+] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
     }
   })
 }
@@ -335,6 +344,7 @@ async function main () {
         payloads.push(marker + value + marker + '\'"><img src=x onerror=alert()>')
       }
     }
+    payloads = [...new Set(payloads)] // Remove duplicates
   }
   if (argv.verbose) printColorful('turquoise', `Payloads: ${JSON.stringify(payloads)}`)
 
@@ -448,8 +458,8 @@ async function main () {
 
   // Guess parameters
   // TODO: Implement better parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
-  if (argv.guessParameters) {
-    await guessParameters(page)
+  if (argv.guessParametersExtended) {
+    await guessParametersExtended(page)
     // Add guessed parameters to parameter list
     for (const parameter of guessedParameters) {
       if (parameters[parameter] === undefined) {
@@ -463,6 +473,10 @@ async function main () {
     printColorful('green', '[+] Scanning parameters...')
 
     for (const parameter in parameters) {
+      if (argv.excludedParameter && argv.excludedParameter.includes(parameter)) {
+        printColorful('green', `[+] Skipping excluded parameter: ${parameter}`)
+        continue
+      }
       printColorful('green', `[+] Scanning parameter: ${parameter}`)
       await registerAnalysisListeners(page, client)
       try {
@@ -475,14 +489,20 @@ async function main () {
     // Determine whether there were parameters guessed sine the initial page load
     if (argv.guessParameters) {
       const newParameters = {}
-      for (const tempParameter of guessedParameters) {
-        if (parameters[tempParameter] === undefined) {
-          newParameters[tempParameter] = marker
+      if (guessedParameters) {
+        for (const tempParameter of guessedParameters) {
+          if (parameters[tempParameter] === undefined) {
+            newParameters[tempParameter] = marker
+          }
         }
       }
       if (newParameters) {
         printColorful('green', `[+] Additional Parameters found since we started our scans. Starting a new scan for parameters: ${JSON.stringify(newParameters)}`)
         for (const parameter in newParameters) {
+          if (argv.excludedParameter && argv.excludedParameter.includes(parameter)) {
+            printColorful('green', `[+] Skipping excluded parameter: ${parameter}`)
+            continue
+          }
           printColorful('green', `[+] Scanning parameter: ${parameter}`)
           await registerAnalysisListeners(page, client)
           try {
