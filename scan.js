@@ -45,6 +45,11 @@ const argv = yargs
     describe: 'Specify user agent',
     type: 'string'
   })
+  .option('excludeFromConsole', {
+    describe: 'Ignore String within Console Messages',
+    type: 'string',
+    array: true
+  })
   .option('proxy', {
     alias: 'p',
     describe: 'Specify HTTP proxy (also disables certificate validation)',
@@ -79,6 +84,7 @@ const initialPageLoadPageErrors = []
 let currentUrl = url
 let currentParameter = ''
 let currentPayload = ''
+let redirectedForParameter = false
 
 // Helper functions
 function parseUrlParameters () {
@@ -125,34 +131,23 @@ async function initialPageLoad (page) {
   })
 
   if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load')
-  await page.goto(url, { waitUntil: 'networkidle0' })
-  await page.waitForFunction(() => document.readyState === 'complete')
+  await page.goto(url, { waitUntil: 'networkidle2' })
+  printColorful('green', '[+] Wait until JS was evaluated...')
+  await page.evaluate(async () => {
+    window.waitedUntilJSExecuted = true
+  })
+  await page.waitForFunction('window.waitedUntilJSExecuted === true')
   if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load Complete')
 }
 
 async function guessParameters (page) {
   // TODO: Implement parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
-  /*fs.readFile('burp-parameter-names.txt', function (err, data) {
+  // 1. Read parameter names from wordlist
+  let parametersFromWordlist
+  fs.readFile('parameter-names.txt', function (err, data) {
     if (err) throw err
-    const parametersFromWordlist = data.toString().split('\n')
-  })*/
-
-  // TODO: 1. Evaluate JS to hook URLSearchParams
-  /*await page.evaluate(async () => {
-    // Hook URLSearchParams: URLSearchParams.prototype.get = function() { alert(arguments[0]) }
-    URLSearchParams.prototype.has = new Proxy(URLSearchParams.prototype.has, {
-      apply: function (target, thisArg, argumentsList) {
-        alert(argumentsList[0])
-        return target.apply(thisArg, argumentsList)
-      }
-    })
-    URLSearchParams.prototype.get = new Proxy(URLSearchParams.prototype.get, {
-      apply: function (target, thisArg, argumentsList) {
-        alert(argumentsList[0])
-        return target.apply(thisArg, argumentsList)
-      }
-    })
-  })*/
+    parametersFromWordlist = data.toString().split('\n')
+  })
 
   // 2. Determine variable assignments in JS code
   const parametersFromJsCode = await page.evaluate(async () => {
@@ -168,11 +163,15 @@ async function guessParameters (page) {
           inlineJsVariableAssignments.push(match[2])
         }
       } else {
-        const response = await fetch(script.src)
-        const scriptContent = await response.text()
-        let match
-        while ((match = regex.exec(scriptContent)) !== null) {
-          inlineJsVariableAssignments.push(match[2])
+        try {
+          const response = await fetch(script.src)
+          const scriptContent = await response.text()
+          let match
+          while ((match = regex.exec(scriptContent)) !== null) {
+            inlineJsVariableAssignments.push(match[2])
+          }
+        } catch (e) {
+          console.log(e)
         }
       }
     }
@@ -182,47 +181,59 @@ async function guessParameters (page) {
   // Hook URLSearchParams: URLSearchParams.prototype.get = function() { alert(arguments[0]) }
 
   // TODO: Verify the guessed parameters by checking if they are reflected in the page or in console messages
-  guessedParameters = parametersFromJsCode
-  printColorful('green', `[+] Guessed Parameters: ${JSON.stringify(guessedParameters)}`)
-  /*// 3. Guess parameters based on wordlist + candidate values from JS code
-  const parameters = parametersFromJsCode.concat(parametersFromWordlist)
-  //  Indicator for successful guess: Marker is reflected in page OR marker is reflected in console message
+  guessedParameters = [...new Set(parametersFromJsCode.concat(parametersFromWordlist))]
+  printColorful('green', `[+] Guessed (but yet unverified) Parameters: ${JSON.stringify(guessedParameters)}`)
+  /* // 3. Verify Guessed Params: Indicator for successful guess: Marker is reflected in page OR marker is reflected in console message
   for (const parameter of parameters) {
     if (guessedParameters.includes(parameter) === false) {
       printColorful('green', `[+] Guessing Parameter: ${parameter}`)
       await guessParameterBatch(page, parameter)
       guessedParameters.push(parameter)
     }
-  }*/
+  } */
 }
 
-async function registerAnalysisListeners (page) {
-  // Register listener for console messages
+async function registerAnalysisListeners (page, client) {
+  // Register listener for console messages and redirects
+  redirectedForParameter = false
+  await client.on('Network.requestWillBeSent', (e) => {
+    // Only print redirects that are not the initial page load
+    if (redirectedForParameter || e.type !== 'Document' || e.documentURL === currentUrl.href || e.documentURL === currentUrl.origin + '/' || e.documentURL === url.href) {
+      return
+    }
+    redirectedForParameter = true
+    printColorful('green', `[+] Found redirect for Payload ${currentPayload} in Param ${currentParameter} to ${e.documentURL}`)
+  })
   await page.on('response', response => {
-    if ([301, 302, 303, 307].includes(response.status())) {
-      printColorful('red', `[+] Found redirect for Payload ${currentPayload} in Param ${currentParameter}:  ${response.status()} ${response.url()}`)
-    } else if (response.status() >= 400) {
-      printColorful('red', `[+] Found error: ${response.status()} ${response.url()}`)
+    if (response.status() >= 400) {
+      printColorful('yellow', `  [+] Found error: ${response.status()} ${response.url()}`)
     }
   }).on('console', message => {
     if (argv.verbose) printColorful('turquoise', `[+] Console Message for Payload ${currentPayload}: ${message.text()}`)
     if (initialPageLoadConsoleMessages.includes(message) === false) {
       // Highlight findings that likely can be exploited
-      if (message.text().includes('Content Security Policy') || message.text().includes('Uncaught SyntaxError: ')) {
-        printColorful('red', `[+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+      if (argv.excludeFromConsole) {
+        for (const excludeString of argv.excludeFromConsole) {
+          if (message.text().includes(excludeString)) {
+            return
+          }
+        }
+      }
+      if (message.text().includes('Content Security Policy') || message.text().includes('Uncaught SyntaxError')) {
+        printColorful('turquoise', `[+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
       } else {
-        printColorful('yellow', `[+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+        printColorful('yellow', `  [+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
       }
     }
   }).on('pageerror', ({ message }) => {
     if (argv.verbose) printColorful('turquoise', `[+] Page Error for Payload ${currentPayload}: ${message}`)
     if (initialPageLoadPageErrors.includes(message) === false) {
-      printColorful('yellow', `[+] New Page Error for Payload ${currentPayload} in Param ${currentParameter}: ${message}`)
+      printColorful('yellow', `  [+] New Page Error for Payload ${currentPayload} in Param ${currentParameter}: ${message}`)
     }
   }).on('requestfailed', request => {
     if (argv.verbose) printColorful('turquoise', `[+] Request Failed: ${request.url()}`)
     if (initialPageLoadRequestfailed.includes(request) === false) {
-      printColorful('yellow', `[+] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
+      printColorful('yellow', `  [+] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
     }
   })
 }
@@ -232,7 +243,7 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
   currentParameter = parameter
   await page.on('response', response => {
     if ([301, 302, 303, 307].includes(response.status())) {
-      printColorful('red', `[+] Found redirect: ${response.status()} ${response.url()}`)
+      printColorful('turquoise', `[+] Found redirect: ${response.status()} ${response.url()}`)
     }
   })
 
@@ -252,7 +263,7 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
 
     // Navigate to URL
     try {
-      await page.goto(urlTemp, { waitUntil: 'networkidle0' })
+      await page.goto(urlTemp, { waitUntil: 'networkidle2' })
       await page.waitForFunction(() => document.readyState === 'complete')
     } catch (e) {
       printColorful('red', `[+] Error during page load: ${e}`)
@@ -264,7 +275,7 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
           return document.documentElement.innerHTML.includes(marker)
         }, marker)
         if (markerFound) {
-          printColorful('red', `[+] Marker was reflected on page for Payload ${payload} in Parameter ${parameter}`)
+          printColorful('turquoise', `[+] Marker was reflected on page for Payload ${payload} in Parameter ${parameter}`)
         }
       } catch (e) {
         printColorful('red', `[+] Error during page evaluation for Marker search: ${e}`)
@@ -334,11 +345,14 @@ async function main () {
     printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
     options.args = []
     options.args.push(`--proxy-server=${argv.proxy}`)
-    printColorful('yellow', '[+] Disabling Certificate Validation...')
+    printColorful('yellow', '  [+] Disabling Certificate Validation...')
     options.args.push('--ignore-certificate-errors')
   }
   const browser = await pt.launch(options)
   const page = await browser.newPage()
+  const client = await page.target().createCDPSession()
+  await client.send('Network.enable')
+  await client.send('Network.setCacheDisabled', { cacheDisabled: true })
 
   // Set user agent
   if (argv.userAgent) {
@@ -347,9 +361,15 @@ async function main () {
     await page.setUserAgent(argv.userAgent)
   }
 
-  // Hook the alert() function withing the page
+  // Hook the alert() function within the page and expose helper function
   await page.exposeFunction('alert', (message) => {
-    printColorful('red', `[+] alert() triggered for Payload ${currentPayload}: ${message}`)
+    printColorful('turquoise', `[+] alert() triggered for Payload ${currentPayload}: ${message}`)
+  })
+  await page.exposeFunction('domscan', (parameter, message) => {
+    if (!guessedParameters.includes(parameter)) {
+      guessedParameters.push(parameter)
+      printColorful('yellow', `  [+] ${message}`)
+    }
   })
 
   // Set cookies
@@ -400,7 +420,29 @@ async function main () {
     request.continue()
   })
 
+  // Hook URLSearchParams to dynamically detect parameters
+  /* global domscan */
+  if (argv.guessParameters) {
+    await page.evaluateOnNewDocument(async () => {
+      // Hook URLSearchParams: URLSearchParams.prototype.get = function() { alert(arguments[0]) }
+      URLSearchParams.prototype.has = new Proxy(URLSearchParams.prototype.has, {
+        apply: function (target, thisArg, argumentsList) {
+          domscan(argumentsList[0], `URLSearchParams.has() is called on ${argumentsList[0]}`)
+          return target.apply(thisArg, argumentsList)
+        }
+      })
+      URLSearchParams.prototype.get = new Proxy(URLSearchParams.prototype.get, {
+        apply: function (target, thisArg, argumentsList) {
+          domscan(argumentsList[0], `URLSearchParams.get() is called on ${argumentsList[0]}`)
+          return target.apply(thisArg, argumentsList)
+        }
+      })
+    })
+  }
+
+  // Initial page load to obtain our reference values
   await initialPageLoad(page)
+  await new Promise(resolve => setTimeout(resolve, 10000))
   // Clear event listeners from initial page load
   await clearPageEventListeners(page)
 
@@ -422,13 +464,35 @@ async function main () {
 
     for (const parameter in parameters) {
       printColorful('green', `[+] Scanning parameter: ${parameter}`)
-      await registerAnalysisListeners(page)
+      await registerAnalysisListeners(page, client)
       try {
         await scanParameterOrFragment(page, parameter)
       } catch (e) {
-        printColorful('red', `[+] Error during scan of parameter ${parameter}: ${e}`)
+        printColorful('yellow', `  [+] Error during scan of parameter ${parameter}: ${e}`)
       }
       await clearPageEventListeners(page)
+    }
+    // Determine whether there were parameters guessed sine the initial page load
+    if (argv.guessParameters) {
+      const newParameters = {}
+      for (const tempParameter of guessedParameters) {
+        if (parameters[tempParameter] === undefined) {
+          newParameters[tempParameter] = marker
+        }
+      }
+      if (newParameters) {
+        printColorful('green', `[+] Additional Parameters found since we started our scans. Starting a new scan for parameters: ${JSON.stringify(newParameters)}`)
+        for (const parameter in newParameters) {
+          printColorful('green', `[+] Scanning parameter: ${parameter}`)
+          await registerAnalysisListeners(page, client)
+          try {
+            await scanParameterOrFragment(page, parameter)
+          } catch (e) {
+            printColorful('red', `[+] Error during scan of parameter ${parameter}: ${e}`)
+          }
+          await clearPageEventListeners(page)
+        }
+      }
     }
   } else {
     printColorful('green', '[+] No parameters to scan.')
@@ -436,7 +500,7 @@ async function main () {
 
   // Scan URL fragments
   printColorful('green', '[+] Scanning URL fragment for injections...')
-  await registerAnalysisListeners(page)
+  await registerAnalysisListeners(page, client)
   await scanParameterOrFragment(page)
   await clearPageEventListeners(page)
 

