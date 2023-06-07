@@ -20,7 +20,44 @@ npm install yargs
 
 ## Usage
 ```console
-node domscan.js --url https://example.com --cookies "test1=test" --cookies "test2=test" --local-storage "test3=test"
+$ node scan.js 
+
+     _                                     
+  __| | ___  _ __ ___  ___  ___ __ _ _ __  
+ / _` |/ _ \| '_ ` _ \/ __|/ __/ _` | '_ \ 
+| (_| | (_) | | | | | \__ \ (_| (_| | | | |
+ \__,_|\___/|_| |_| |_|___/\___\__,_|_| |_|
+             
+ (C) Lauritz Holtmann, 2023
+ 
+Options:
+      --version                  Show version number                   [boolean]
+  -v, --verbose                  Enable verbose output                 [boolean]
+      --headless                 Open browser in headless mode
+                                                       [boolean] [default: true]
+  -g, --guessParameters          Enable parameter guessing based on
+                                 URLSearchParams                       [boolean]
+  -G, --guessParametersExtended  Enable extended parameter guessing based on
+                                 variable definition in JS code and wordlist
+                                                                       [boolean]
+  -u, --userAgent                Specify user agent                     [string]
+      --excludeFromConsole       Ignore String within Console Messages   [array]
+  -p, --proxy                    Specify HTTP proxy (also disables certificate
+                                 validation)                            [string]
+  -c, --cookie                   Specify cookies (multiple values allowed)
+                                                                         [array]
+      --excludedParameter        Exclude parameter from scan (multiple values
+                                 allowed)                                [array]
+  -l, --localStorage             Specify localStorage entries (multiple values
+                                 allowed)                                [array]
+  -h, --help                     Show help                             [boolean]
+
+Please provide a URL.
+```
+
+Example:    
+```console
+$ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
 ```
 
 ## Credits
