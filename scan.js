@@ -85,7 +85,7 @@ const marker = Math.random().toString(32).substring(2, 10)
 payloads = payloads.map(payload => payload.replace('MARKER', marker))
 
 const parameters = {}
-let guessedParameters
+let guessedParameters = []
 
 const initialPageLoadConsoleMessages = []
 const initialPageLoadRequestfailed = []
@@ -171,7 +171,7 @@ async function guessParametersExtended (page) {
         while ((match = regex.exec(scriptContent)) !== null) {
           inlineJsVariableAssignments.push(match[2])
         }
-      } else if (new URL(script.src).hostname === window.location.hostname) { // Only fetch scripts from same origin
+      } else if (script.src && new URL(script.src).hostname === window.location.hostname) { // Only fetch scripts from same origin
         try {
           const response = await fetch(script.src)
           const scriptContent = await response.text()
@@ -460,6 +460,8 @@ async function main () {
   // TODO: Implement better parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
   if (argv.guessParametersExtended) {
     await guessParametersExtended(page)
+  }
+  if (guessedParameters) {
     // Add guessed parameters to parameter list
     for (const parameter of guessedParameters) {
       if (parameters[parameter] === undefined) {
