@@ -12,10 +12,12 @@ Its approach is as follows:
     - If a marker is found within the DOM.
 
 ## Installation
-DOMscan requires NodeJS and npm to be installed. To install the dependencies, run:
+DOMscan requires NodeJS and npm to be installed. To install its dependencies, run:
 ```console
-npm install puppeteer
-npm install yargs
+$ git clone https://github.com/lauritzh/domscan
+$ cd domscan
+$ npm install puppeteer
+$ npm install yargs
 ```
 
 ## Usage
