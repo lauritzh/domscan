@@ -64,3 +64,5 @@ $ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "ses
 
 ## Credits
 This tool comes with a set of payloads. While most of these are quite generic, one Polyglot is based on [0xsobky's "Ultimate XSS Polyglot"](https://github.com/0xsobky/HackVault/wiki/Unleashing-an-Ultimate-XSS-Polyglot). If you would like to add your own payloads, feel free to do so. If you would like to share them, please create a pull request.
+
+Further, the `-g` guessing technique was inspired by [this tip](https://twitter.com/intigriti/status/1631997679793233922) by [@bemodtwz](https://twitter.com/bemodtwz).
