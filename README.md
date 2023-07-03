@@ -11,6 +11,8 @@ Its approach is as follows:
     - If there is a redirect and if so, if it includes a marker.
     - If a marker is found within the DOM.
 
+*Attention: This is research-level code which should be used very carefully. Do not run it against any assets if you do not understand what you are doing!*
+
 ## Installation
 DOMscan requires NodeJS and npm to be installed. To install its dependencies, run:
 ```console
