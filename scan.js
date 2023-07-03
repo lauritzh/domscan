@@ -40,6 +40,11 @@ const argv = yargs
     describe: 'Enable parameter guessing based on URLSearchParams',
     type: 'boolean'
   })
+  .option('throttle', {
+    alias: 't',
+    describe: 'Throttle connection to 1 MBit/s',
+    type: 'boolean'
+  })
   .option('guessParametersExtended', {
     alias: 'G',
     describe: 'Enable extended parameter guessing based on variable definition in JS code and wordlist',
@@ -363,6 +368,16 @@ async function main () {
   const client = await page.target().createCDPSession()
   await client.send('Network.enable')
   await client.send('Network.setCacheDisabled', { cacheDisabled: true })
+
+  if (argv.throttle) {
+    printColorful('green', '[+] Throttling connection to 1 MBit/s...')
+    await client.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 0,
+      downloadThroughput: 125000,
+      uploadThroughput: 125000
+    })
+  }
 
   // Set user agent
   if (argv.userAgent) {
