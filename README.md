@@ -41,6 +41,7 @@ Options:
                                                        [boolean] [default: true]
   -g, --guessParameters          Enable parameter guessing based on
                                  URLSearchParams                       [boolean]
+  -t, --throttle                 Throttle connection to 1 MBit/s       [boolean]
   -G, --guessParametersExtended  Enable extended parameter guessing based on
                                  variable definition in JS code and wordlist
                                                                        [boolean]
