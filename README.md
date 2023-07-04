@@ -93,7 +93,7 @@ DOMscan is a research tool and should be used with caution. It is not meant to b
 
 The tool itself is regularly scanned using [Semgrep](https://semgrep.dev/). Because the headless browser navigates to any provided URL, Semgrep reports the tool to be vulnerable to *Server-Side Request Forgery* (SSRF) attacks. This is by design. If you are concerned about this, you should run it in a sandboxed environment. Code snippets that were reported by Semgrep to be vulnerable to SSRF attacks [were excluded from the automated scan](https://semgrep.dev/docs/ignoring-files-folders-code/).
 
-If you found any vulnerability in this repository, please reach out to [security@lauritz-holtmann.de](mailto:security@lauritz-holtmann.de) instead of opening a public issue.
+If you found any vulnerability in this repository, please use GitHub's [private vulnerability reporting](https://github.com/lauritzh/domscan/security) instead of opening a public issue.
 
 ## Credits
 This tool comes with a set of payloads. While most of these are quite generic, one Polyglot is based on [0xsobky's "Ultimate XSS Polyglot"](https://github.com/0xsobky/HackVault/wiki/Unleashing-an-Ultimate-XSS-Polyglot). If you would like to add your payloads, feel free to do so. If you would like to share them, please create a pull request.
