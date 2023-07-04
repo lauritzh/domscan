@@ -65,6 +65,20 @@ Example:
 $ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
 ```
 
+At the moment, DOMscan only supports one URL per scan. If you want to scan multiple URLs from a text file, you can circumvent this limitation using Bash as follows:
+`urls.txt:`
+```txt
+http://poc.local/?test=test
+http://poc.local/?test2=test
+```
+Launch DOMscan as follows:    
+```bash
+while read in; do
+    node scan.js "$in"
+done < urls.txt
+```
+(See [this issue](https://github.com/lauritzh/domscan/issues/17))
+
 ## Credits
 This tool comes with a set of payloads. While most of these are quite generic, one Polyglot is based on [0xsobky's "Ultimate XSS Polyglot"](https://github.com/0xsobky/HackVault/wiki/Unleashing-an-Ultimate-XSS-Polyglot). If you would like to add your payloads, feel free to do so. If you would like to share them, please create a pull request.
 
