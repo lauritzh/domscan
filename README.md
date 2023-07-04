@@ -1,6 +1,8 @@
 DOMSCAN
 =======
 
+![Semgrep](https://github.com/lauritzh/domscan/actions/workflows/semgrep.yml/badge.svg)
+
 DOMscan is a simple tool to scan a website for (DOM-based) XSS vulnerabilities and Open Redirects.
 
 Its approach is as follows:
@@ -64,6 +66,18 @@ Example:
 ```console
 $ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
 ```
+
+## PoC App
+There is a simple PoC app included in this repository. To launch it, simply run:
+```console
+$ cd poc-app
+$ node poc-app.js
+```
+
+## Security Considerations
+DOMscan is a research tool and should be used with caution. It is not meant to be used against any assets without prior consent.
+
+The tool itself is regularly scanned using [Semgrep](https://semgrep.dev/). Because the headless browser navigates to any provided URL, Semgrep reports the tool to be vulnerable to *Server-Side Request Forgery* (SSRF) attacks. This is by design. If you are concerned about this, you should run it in a sandboxed environment. Code snippets that were reported by Semgrep to be vulnerable to SSRF attacks [were excluded from the automated scan](https://semgrep.dev/docs/ignoring-files-folders-code/).
 
 ## Credits
 This tool comes with a set of payloads. While most of these are quite generic, one Polyglot is based on [0xsobky's "Ultimate XSS Polyglot"](https://github.com/0xsobky/HackVault/wiki/Unleashing-an-Ultimate-XSS-Polyglot). If you would like to add your own payloads, feel free to do so. If you would like to share them, please create a pull request.

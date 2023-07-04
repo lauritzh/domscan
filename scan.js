@@ -145,6 +145,8 @@ async function initialPageLoad (page) {
   })
 
   if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load')
+  // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
+  // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
   await page.goto(url, { waitUntil: 'networkidle2' })
   printColorful('green', '[+] Wait until JS was evaluated...')
   await page.evaluate(async () => {
@@ -277,6 +279,8 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
 
     // Navigate to URL
     try {
+      // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
+      // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
       await page.goto(urlTemp, { waitUntil: 'networkidle2' })
       await page.waitForFunction(() => document.readyState === 'complete')
     } catch (e) {
@@ -420,6 +424,8 @@ async function main () {
     printColorful('green', '[+] Setting local storage...')
     if (argv.verbose) printColorful('turquoise', '[+] Local Storage: ' + JSON.stringify(argv.localStorage))
     argv.localStorage.forEach(item => {
+      // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
+      // nosemgrep javascript.puppeteer.security.audit.puppeteer-evaluate-arg-injection.puppeteer-evaluate-arg-injection
       page.evaluate((item) => {
         try {
           localStorage.setItem(item.split('=')[0], item.split('=')[1])
