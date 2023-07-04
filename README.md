@@ -67,13 +67,6 @@ Example:
 $ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
 ```
 
-## PoC App
-There is a simple PoC app included in this repository. To launch it, simply run:
-```console
-$ cd poc-app
-$ node poc-app.js
-```
-
 At the moment, DOMscan only supports one URL per scan. If you want to scan multiple URLs from a text file, you can circumvent this limitation using Bash as follows:
 `urls.txt:`    
 ```txt
@@ -87,6 +80,13 @@ while read in; do
 done < urls.txt
 ```
 (See [this issue](https://github.com/lauritzh/domscan/issues/17))
+
+## PoC App
+There is a simple PoC app included in this repository. To launch it, simply run:
+```console
+$ cd poc-app
+$ node poc-app.js
+```
 
 ## Security Considerations
 DOMscan is a research tool and should be used with caution. It is not meant to be used against any assets without prior consent.
