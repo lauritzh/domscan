@@ -53,6 +53,8 @@ Options:
                                  validation)                            [string]
   -c, --cookie                   Specify cookies (multiple values allowed)
                                                                          [array]
+  -i, --interactive              Pause on each payload and wait for user input
+                                                                       [boolean]
       --excludedParameter        Exclude parameter from scan (multiple values
                                  allowed)                                [array]
   -l, --localStorage             Specify localStorage entries (multiple values

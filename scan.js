@@ -4,10 +4,11 @@
 // (c) Lauritz Holtmann, 2023
 //
 
-const pt = require('puppeteer')
-const yargs = require('yargs')
-const process = require('process')
 const fs = require('fs')
+const yargs = require('yargs')
+const pt = require('puppeteer')
+const process = require('process')
+const readline = require('readline')
 let payloads = require('./payloads.json')
 
 // ASCII Art
@@ -69,6 +70,11 @@ const argv = yargs
     alias: 'c',
     describe: 'Specify cookies (multiple values allowed)',
     array: true
+  })
+  .option('interactive', {
+    alias: 'i',
+    describe: 'Pause on each payload and wait for user input',
+    type: 'boolean'
   })
   .option('excludedParameter', {
     describe: 'Exclude parameter from scan (multiple values allowed)',
@@ -299,13 +305,31 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
         printColorful('red', `[+] Error during page evaluation for Marker search: ${e}`)
       }
     }
-
-    if (argv.verbose) printColorful('turquoise', `[+] Scan of Parameter: ${parameter} Complete`)
+    if (argv.verbose || argv.interactive) printColorful('white', `[+] Tested payload "${currentPayload}" in Parameter "${parameter}"`)
+    if (argv.interactive) {
+      await waitForAnyInput()
+    }
   }
+}
+
+function waitForAnyInput () {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    })
+    rl.question('Press any key to continue...', () => {
+      rl.close()
+      resolve()
+    })
+  })
 }
 
 function printColorful (color, text) {
   switch (color) {
+    case 'white':
+      color = '\x1b[37m'
+      break
     case 'red':
       color = '\x1b[31m'
       break
