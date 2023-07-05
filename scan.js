@@ -432,6 +432,10 @@ async function main () {
   // Set cookies
   if (argv.cookies !== undefined) {
     printColorful('green', '[+] Setting cookies...')
+    // If argv.cookies is string, convert to array
+    if (typeof argv.cookies === 'string') {
+      argv.cookies = [argv.cookies]
+    }
     if (argv.verbose) printColorful('turquoise', `[+] Cookies: ${JSON.stringify(argv.cookies)}`)
     const preparedCookies = argv.cookies.map(cookie => {
       return {
