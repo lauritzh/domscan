@@ -91,7 +91,7 @@ DOMscan comes with a basic set of payloads. If you would like to add your own, y
 ]
 ```
 
-The tool hooks the `alert()` method as well as a custom `xyz()` method. The latter can be used to bypass WAFs and filters that block the `alert()` method. Therefore, payloads within the `payloads.json` could include look as follows:
+To detect JavaScript execution, the tool hooks the `alert()` method as well as a custom `xyz()` method. The latter can be used to bypass WAFs and filters that block the `alert()` method. Therefore, payloads within the `payloads.json` could look as follows:
 ```json
 [
   "<script>alert()</script>",
