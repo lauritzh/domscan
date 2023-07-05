@@ -414,10 +414,14 @@ async function main () {
     await page.setUserAgent(argv.userAgent)
   }
 
-  // Hook the alert() function within the page and expose helper function
+  // Hook the alert() and xyz() function within the page context
   await page.exposeFunction('alert', (message) => {
-    printColorful('turquoise', `[+] alert() triggered for Payload ${currentPayload}: ${message}`)
+    printColorful('turquoise', `[+] Possible XSS: alert() triggered for Payload ${currentPayload}: ${message}`)
   })
+  await page.exposeFunction('xyz', (message) => {
+    printColorful('turquoise', `[+] Possible XSS: xyz() triggered for Payload ${currentPayload}: ${message}`)
+  })
+  // Helper function to detect parameters
   await page.exposeFunction('domscan', (parameter, message) => {
     if (!guessedParameters.includes(parameter)) {
       guessedParameters.push(parameter)

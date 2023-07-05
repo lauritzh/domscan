@@ -83,6 +83,22 @@ done < urls.txt
 ```
 (See [this issue](https://github.com/lauritzh/domscan/issues/17))
 
+## Custom Payloads
+DOMscan comes with a basic set of payloads. If you would like to add your own, you can do so by adding them to the `payloads.json` file. An exemplary payload file could look as follows:
+```json
+[
+  "<script>alert()</script>"
+]
+```
+
+The tool hooks the `alert()` method as well as a custom `xyz()` method. The latter can be used to bypass WAFs and filters that block the `alert()` method. Therefore, payloads within the `payloads.json` could include look as follows:
+```json
+[
+  "<script>alert()</script>",
+  "<script>xyz()</script>"
+]
+```
+
 ## PoC App
 There is a simple PoC app included in this repository. To launch it, simply run:
 ```console
