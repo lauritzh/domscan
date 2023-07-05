@@ -1,4 +1,4 @@
-DOMSCAN
+DOMscan
 =======
 
 ![Semgrep](https://github.com/lauritzh/domscan/actions/workflows/semgrep.yml/badge.svg)
@@ -13,7 +13,7 @@ Its approach is as follows:
     - If there is a redirect and if so, if it includes a marker.
     - If a marker is found within the DOM.
 
-*Attention: This is research-grade code that should be used very carefully. Do not run it against any assets if you do not understand what you are doing!*
+*Attention: This is research-grade code that should be used very carefully. Do not run it against any assets if you do not understand what you are doing! Further, this tool is intended to support **manual analysis** and by no means optimized to be integrated into unsupervised tool chains.*
 
 ## Installation
 DOMscan requires NodeJS and npm to be installed. To install its dependencies, run:
