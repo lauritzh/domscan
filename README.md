@@ -64,9 +64,15 @@ Options:
 Please provide a URL.
 ```
 
-Example:    
+**Examples**:    
+Interactive scan with parameter guessing and custom user agent, pauses after each payload and waits for user input:
 ```console
-$ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
+$ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --interactive --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
+```
+
+Non-interactive scan with parameter guessing:
+```console
+$ node scan.js -g -G "https://lhq.at/?test=Test"
 ```
 
 At the moment, DOMscan only supports one URL per scan. If you want to scan multiple URLs from a text file, you can circumvent this limitation using Bash as follows:
