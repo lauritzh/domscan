@@ -20,8 +20,7 @@ DOMscan requires NodeJS and npm to be installed. To install its dependencies, ru
 ```console
 $ git clone https://github.com/lauritzh/domscan
 $ cd domscan
-$ npm install puppeteer
-$ npm install yargs
+$ npm i --omit=dev
 ```
 
 ## Usage

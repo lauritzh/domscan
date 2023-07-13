@@ -1,6 +1,14 @@
 {
+  "name": "domscan",
+  "author": "Lauritz Holtmann",
+  "version": "v0.0.2",
+  "description": "Simple tool to scan a website for (DOM-based) XSS vulnerabilities and Open Redirects.",
+  "main": "scan.js",
+  "engines": {
+    "npm": "^9",
+    "node": "^20"
+  },
   "dependencies": {
-    "express": "^4.18.2",
     "puppeteer": "^20.7.4",
     "yargs": "^17.7.2"
   },
