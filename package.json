@@ -9,7 +9,7 @@
     "node": "^20"
   },
   "dependencies": {
-    "puppeteer": "^20.7.4",
+    "puppeteer": "^20.8.1",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
