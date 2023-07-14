@@ -20,12 +20,12 @@ DOMscan requires NodeJS and npm to be installed. To install its dependencies, ru
 ```console
 $ git clone https://github.com/lauritzh/domscan
 $ cd domscan
-$ npm i --omit=dev
+$ npm i -g
 ```
 
 ## Usage
 ```console
-$ node scan.js 
+$ domscan
 
      _                                     
   __| | ___  _ __ ___  ___  ___ __ _ _ __  
@@ -66,12 +66,12 @@ Please provide a URL.
 **Examples**:    
 Interactive scan with parameter guessing and custom user agent, pauses after each payload and waits for user input:
 ```console
-$ node scan.js -g -G "https://lhq.at/?test=Test" --headless false --interactive --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
+$ domscan -g -G "https://lhq.at/?test=Test" --headless false --interactive --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
 ```
 
 Non-interactive scan with parameter guessing:
 ```console
-$ node scan.js -g -G "https://lhq.at/?test=Test"
+$ domscan -g -G "https://lhq.at/?test=Test"
 ```
 
 At the moment, DOMscan only supports one URL per scan. If you want to scan multiple URLs from a text file, you can circumvent this limitation using Bash as follows:
@@ -83,7 +83,7 @@ http://poc.local/?test2=test
 Launch DOMscan as follows:    
 ```bash
 while read in; do
-    node scan.js "$in"
+    domscan "$in"
 done < urls.txt
 ```
 (See [this issue](https://github.com/lauritzh/domscan/issues/17))

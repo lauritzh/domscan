@@ -8,6 +8,9 @@
     "npm": "^9",
     "node": "^20"
   },
+  "bin": {
+    "domscan": "./scan.js"
+  },
   "dependencies": {
     "puppeteer": "^20.8.1",
     "yargs": "^17.7.2"
