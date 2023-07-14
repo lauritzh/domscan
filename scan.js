@@ -25,7 +25,7 @@ console.log(art)
 
 // Define the command-line interface
 const argv = yargs
-  .version('0.0.2')
+  .version('v0.0.3')
   .option('verbose', {
     alias: 'v',
     describe: 'Enable verbose output',
@@ -101,6 +101,7 @@ let guessedParameters = []
 const initialPageLoadConsoleMessages = []
 const initialPageLoadRequestfailed = []
 const initialPageLoadPageErrors = []
+const findings = {}
 let currentUrl = url
 let currentParameter = ''
 let currentPayload = ''
@@ -118,12 +119,15 @@ function parseUrlParameters () {
         parameters[key].push(value)
       }
     }
-    printColorful('green', 'URL Parameters: ' + JSON.stringify(parameters))
+    printColorful('green', '[+] URL Parameters: ' + JSON.stringify(parameters))
   } else {
-    printColorful('green', 'No URL parameters found.')
+    printColorful('red', '[!] No URL parameters found. If you do not intent to only guess parameters (see help), please provide an URL that already includes GET parameters.')
   }
 }
 
+/**
+ * @param {Object} page - The puppeteer page Object
+ */
 async function clearPageEventListeners (page) {
   await page.removeAllListeners('console')
   await page.removeAllListeners('response')
@@ -131,6 +135,9 @@ async function clearPageEventListeners (page) {
   await page.removeAllListeners('requestfailed')
 }
 
+/**
+ * @param {Object} page - The puppeteer page Object
+ */
 async function initialPageLoad (page) {
   page.on('response', response => {
     // Detect immediate redirects
@@ -162,6 +169,9 @@ async function initialPageLoad (page) {
   if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load Complete')
 }
 
+/**
+ * @param {Object} page - The puppeteer page Object
+ */
 async function guessParametersExtended (page) {
   // TODO: Implement parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
   // 1. Read parameter names from wordlist
@@ -215,6 +225,10 @@ async function guessParametersExtended (page) {
   } */
 }
 
+/**
+ * @param {Object} page - The puppeteer page Object
+ * @param {string} client - The puppeteer client Object
+ */
 async function registerAnalysisListeners (page, client) {
   // Register listener for console messages and redirects
   redirectedForParameter = false
@@ -242,9 +256,11 @@ async function registerAnalysisListeners (page, client) {
         }
       }
       if (message.text().includes('Content Security Policy') || message.text().includes('Uncaught SyntaxError')) {
-        printColorful('turquoise', `[+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+        printColorful('turquoise', `[!] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+        addFinding('possible-xss', 'medium', `Console Message indicates CSP or Syntax Error: ${message.text().trim()}`)
       } else {
-        printColorful('yellow', `  [+] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+        printColorful('yellow', `  [*] New Console Message for Payload ${currentPayload} in Param ${currentParameter}: ${message.text().trim()}`)
+        addFinding('new-console-message', 'low', message.text().trim())
       }
     }
   }).on('pageerror', ({ message }) => {
@@ -260,12 +276,17 @@ async function registerAnalysisListeners (page, client) {
   })
 }
 
+/**
+ * @param {Object} page - The puppeteer page Object
+ * @param {string} parameter - The parameter to be scanned
+ */
 async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
   let markerFound = false
   currentParameter = parameter
   await page.on('response', response => {
     if ([301, 302, 303, 307].includes(response.status())) {
-      printColorful('turquoise', `[+] Found redirect: ${response.status()} ${response.url()}`)
+      printColorful('turquoise', `[!] Found redirect: ${response.status()} ${response.url()}`)
+      addFinding('open-redirect', 'medium', `${response.status()} Redirect to ${response.url()}`)
     }
   })
 
@@ -299,7 +320,8 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
           return document.documentElement.innerHTML.includes(marker)
         }, marker)
         if (markerFound) {
-          printColorful('turquoise', `[+] Marker was reflected on page for Payload ${payload} in Parameter ${parameter}`)
+          printColorful('turquoise', `[!] Marker was reflected on page for Payload ${payload} in Parameter ${parameter}`)
+          addFinding('marker-reflected', 'info')
         }
       } catch (e) {
         printColorful('red', `[+] Error during page evaluation for Marker search: ${e}`)
@@ -325,6 +347,10 @@ function waitForAnyInput () {
   })
 }
 
+/**
+ * @param {'white' | 'red' | 'green' | 'blue' | 'turquoise'} color - The color to print the text
+ * @param {string} text - The text that should be printed
+ */
 function printColorful (color, text) {
   switch (color) {
     case 'white':
@@ -349,6 +375,92 @@ function printColorful (color, text) {
       color = '\x1b[0m'
   }
   console.log(color + text + '\x1b[0m')
+}
+
+/**
+ * @param {'possible-xss' | 'xss' | 'open-redirect' | 'marker-in-url' | 'marker-reflected' | 'new-console-message'} type - The vulnerability type
+ * @param {'info' | 'low' | 'medium' | 'high'} severity - The severity of this finding
+ * @param {string} comment
+ */
+function addFinding (type, severity, comment = '') {
+  if (findings[currentParameter] === undefined) {
+    findings[currentParameter] = []
+  }
+  findings[currentParameter].push([currentPayload, type, severity, comment])
+}
+
+function generateSummary () {
+  printColorful('green', '#'.repeat(process.stdout.columns))
+  printColorful('green', '[+] Summary:')
+  const overallFindingsCount = Object.keys(findings).length
+  if (overallFindingsCount === 0) {
+    printColorful('green', '  [+] No findings! :(')
+  } else {
+    printColorful('green', `  [+] There were findings for ${overallFindingsCount} parameter(s) during this scan run.`)
+
+    for (const parameter in findings) {
+      printColorful('white', `[+] Parameter: ${parameter}`)
+
+      const info = []
+      const low = []
+      const medium = []
+      const high = []
+
+      findings[parameter].forEach(finding => {
+        switch (finding[2]) {
+          case ('info'):
+            if (info[finding[1]] === undefined) {
+              info[finding[1]] = []
+            }
+            info[finding[1]].push(finding)
+            break
+          case ('low'):
+            if (low[finding[1]] === undefined) {
+              low[finding[1]] = []
+            }
+            low[finding[1]].push(finding)
+            break
+          case ('medium'):
+            if (medium[finding[1]] === undefined) {
+              medium[finding[1]] = []
+            }
+            medium[finding[1]].push(finding)
+            break
+          case ('high'):
+            if (high[finding[1]] === undefined) {
+              high[finding[1]] = []
+            }
+            high[finding[1]].push(finding)
+            break
+        }
+      })
+      printParameterSummary(high, 'HIGH')
+      printParameterSummary(medium, 'MEDIUM')
+      printParameterSummary(low, 'LOW')
+      printParameterSummary(info, 'INFORMATIONAL')
+    }
+  }
+}
+
+/**
+ * @param {array} severityFindings
+ * @param {'info' | 'low' | 'medium' | 'high'} severity
+ */
+function printParameterSummary (severityFindings, severity) {
+  const severityFindingsCount = Object.keys(severityFindings).length
+  if (severityFindingsCount > 0) {
+    printColorful('white', `  * ${severityFindingsCount} ${severity} finding(s)`)
+    for (const severityFindingCategoryKey in severityFindings) {
+      printColorful('white', `    [${severityFindingCategoryKey}]`)
+      const uniquePayloads = new Set()
+      severityFindings[severityFindingCategoryKey].forEach(item => {
+        uniquePayloads.add(item[0])
+      })
+      uniquePayloads.forEach(payload => {
+        printColorful('white', `    - Payload: ${payload}`)
+      })
+    }
+  }
 }
 
 // Globally catch uncaught exceptions - this is necessary because the browser throws uncatchable exceptions from time to time
@@ -416,10 +528,12 @@ async function main () {
 
   // Hook the alert() and xyz() function within the page context
   await page.exposeFunction('alert', (message) => {
-    printColorful('turquoise', `[+] Possible XSS: alert() triggered for Payload ${currentPayload}: ${message}`)
+    printColorful('turquoise', `[!] Possible XSS: alert() triggered for Payload ${currentPayload}: ${message}`)
+    addFinding('xss', 'high', `alert() triggered with message ${message}`)
   })
   await page.exposeFunction('xyz', (message) => {
-    printColorful('turquoise', `[+] Possible XSS: xyz() triggered for Payload ${currentPayload}: ${message}`)
+    printColorful('turquoise', `[!] Possible XSS: xyz() triggered for Payload ${currentPayload}: ${message}`)
+    addFinding('xss', 'high', `xyz() triggered with message ${message}`)
   })
   // Helper function to detect parameters
   await page.exposeFunction('domscan', (parameter, message) => {
@@ -478,7 +592,8 @@ async function main () {
     // Intercept requests
     //   Search for marker in URL but ignore the initial page load where we set the marker ourselves
     if (request.url().includes(marker) && request.url() !== currentUrl.href) {
-      printColorful('turquoise', `[+] Found marker ${marker} in URL: ${request.url()}`)
+      printColorful('turquoise', `[!] Found marker ${marker} in URL: ${request.url()}`)
+      addFinding('marker-in-url', 'info', `${marker} in URL: ${request.url()}`)
     }
     request.continue()
   })
@@ -584,6 +699,8 @@ async function main () {
   // Cleanup
   await browser.close()
   printColorful('green', '[+] Browser closed.')
+
+  generateSummary()
 }
 
 main()
