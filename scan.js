@@ -121,7 +121,7 @@ function parseUrlParameters () {
     }
     printColorful('green', '[+] URL Parameters: ' + JSON.stringify(parameters))
   } else {
-    printColorful('red', '[!] No URL parameters found. If you do not intent to only guess parameters (see help), please provide an URL that already includes GET parameters.')
+    printColorful('red', '[!] No URL parameters found. If you do not intent to only guess parameters (see help) or scan the URL fragment, please provide an URL that already includes GET parameters.')
   }
 }
 
@@ -569,10 +569,13 @@ async function main () {
   if (argv.localStorage !== undefined) {
     printColorful('green', '[+] Setting local storage...')
     if (argv.verbose) printColorful('turquoise', '[+] Local Storage: ' + JSON.stringify(argv.localStorage))
+    if (typeof argv.localStorage === 'string') {
+      argv.localStorage = [argv.localStorage]
+    }
     argv.localStorage.forEach(item => {
       // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
       // nosemgrep javascript.puppeteer.security.audit.puppeteer-evaluate-arg-injection.puppeteer-evaluate-arg-injection
-      page.evaluate((item) => {
+      page.evaluateOnNewDocument((item) => {
         try {
           localStorage.setItem(item.split('=')[0], item.split('=')[1])
         } catch (e) {
