@@ -13,9 +13,8 @@
             ],
             "program": "${workspaceFolder}/scan.js",
             "args": [
-                "https://lhq.at/?test=test",
-                "-u \"Intigriti - _lauritz_ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36\"",
-                "-p \"http://127.0.0.1:8080\""
+                "https://lhq.at/test?test1=test#/test?test2=test",
+                "-u \"Intigriti - _lauritz_ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36\""
             ]
         }
     ]

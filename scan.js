@@ -96,6 +96,7 @@ const marker = Math.random().toString(32).substring(2, 10)
 payloads = payloads.map(payload => payload.replace('MARKER', marker))
 
 const parameters = {}
+const fragmentParameters = {}
 let guessedParameters = []
 
 const initialPageLoadConsoleMessages = []
@@ -121,7 +122,22 @@ function parseUrlParameters () {
     }
     printColorful('green', '[+] URL Parameters: ' + JSON.stringify(parameters))
   } else {
-    printColorful('red', '[!] No URL parameters found. If you do not intent to only guess parameters (see help) or scan the URL fragment, please provide an URL that already includes GET parameters.')
+    printColorful('red', '[!] No URL or hash parameters found. If you do not intent to only guess parameters (see help), please provide an URL that already includes GET parameters.')
+  }
+  if (url.hash !== undefined && (url.hash.includes('?'))) {
+    const fragmentParamsTemp = new URLSearchParams(url.hash.slice(url.hash.indexOf('?') + 1))
+    if (fragmentParamsTemp.entries().next().value !== undefined) {
+      for (const [key, value] of fragmentParamsTemp.entries()) {
+        if (fragmentParameters[key] === undefined) {
+          fragmentParameters[key] = value
+        } else if (Array.isArray(fragmentParameters[key]) === false) {
+          fragmentParameters[key] = [fragmentParameters[key], value]
+        } else {
+          fragmentParameters[key].push(value)
+        }
+      }
+      printColorful('green', '[+] Fragment (#) Parameters: ' + JSON.stringify(parameters))
+    }
   }
 }
 
@@ -278,9 +294,10 @@ async function registerAnalysisListeners (page, client) {
 
 /**
  * @param {Object} page - The puppeteer page Object
+ * @param {bool} fragment - Determine whether the query string or fragment should be scanned
  * @param {string} parameter - The parameter to be scanned
  */
-async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
+async function scanParameterOrFragment (page, fragment = false, parameter = 'URL-FRAGMENT') {
   let markerFound = false
   currentParameter = parameter
   await page.on('response', response => {
@@ -296,9 +313,13 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
     currentPayload = payload
     if (argv.verbose) printColorful('turquoise', `[+] Testing Payload: ${payload}`)
     const urlTemp = new URL(argv._[0]) // Create a new URL object to avoid side effects such as appending the payload multiple times
-    if (parameter === 'URL-FRAGMENT') {
+    if (fragment === true && parameter === 'URL-FRAGMENT') { // Directly inject payload to fragment
       urlTemp.hash = payload
-    } else {
+    } else if (fragment === true) { // Set payload in URL fragment parameter
+      const fragmentParamsTemp = new URLSearchParams(urlTemp.hash.slice(urlTemp.hash.indexOf('?') + 1))
+      fragmentParamsTemp.set(parameter, payload)
+      urlTemp.hash = url.hash.substring(0, urlTemp.hash.indexOf('?') + 1) + fragmentParamsTemp.toString()
+    } else { // Set payload in query parameter
       urlTemp.searchParams.set(parameter, payload)
     }
     if (argv.verbose) printColorful('turquoise', `[+] Resulting URL: ${urlTemp}`)
@@ -309,7 +330,11 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
       // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
       // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
       await page.goto(urlTemp, { waitUntil: 'networkidle2' })
+      if (fragment) page.reload()
       await page.waitForFunction(() => document.readyState === 'complete')
+      await page.evaluate(async () => {
+        window.waitedUntilJSExecuted = true
+      })
     } catch (e) {
       printColorful('red', `[+] Error during page load: ${e}`)
     }
@@ -340,7 +365,7 @@ function waitForAnyInput () {
       input: process.stdin,
       output: process.stdout
     })
-    rl.question('Press any key to continue...', () => {
+    rl.question('Press ENTER to continue...', () => {
       rl.close()
       resolve()
     })
@@ -653,7 +678,7 @@ async function main () {
       printColorful('green', `[+] Scanning parameter: ${parameter}`)
       await registerAnalysisListeners(page, client)
       try {
-        await scanParameterOrFragment(page, parameter)
+        await scanParameterOrFragment(page, false, parameter)
       } catch (e) {
         printColorful('yellow', `  [+] Error during scan of parameter ${parameter}: ${e}`)
       }
@@ -679,7 +704,7 @@ async function main () {
           printColorful('green', `[+] Scanning parameter: ${parameter}`)
           await registerAnalysisListeners(page, client)
           try {
-            await scanParameterOrFragment(page, parameter)
+            await scanParameterOrFragment(page, false, parameter)
           } catch (e) {
             printColorful('red', `[+] Error during scan of parameter ${parameter}: ${e}`)
           }
@@ -688,13 +713,32 @@ async function main () {
       }
     }
   } else {
-    printColorful('green', '[+] No parameters to scan.')
+    printColorful('red', '[+] No parameters to scan.')
+  }
+
+  // Scan URL Fragment parameters
+  if (fragmentParameters) {
+    printColorful('green', '[+] Scanning URL fragment parameters for injections...')
+    for (const parameter in fragmentParameters) {
+      if (argv.excludedParameter && argv.excludedParameter.includes(parameter)) {
+        printColorful('green', `[+] Skipping excluded parameter: ${parameter}`)
+        continue
+      }
+      printColorful('green', `[+] Scanning parameter: ${parameter}`)
+      await registerAnalysisListeners(page, client)
+      try {
+        await scanParameterOrFragment(page, true, parameter)
+      } catch (e) {
+        printColorful('yellow', `  [+] Error during scan of parameter ${parameter}: ${e}`)
+      }
+      await clearPageEventListeners(page)
+    }
   }
 
   // Scan URL fragments
   printColorful('green', '[+] Scanning URL fragment for injections...')
   await registerAnalysisListeners(page, client)
-  await scanParameterOrFragment(page)
+  await scanParameterOrFragment(page, true)
   await clearPageEventListeners(page)
 
   // TODO: Parse location.hash for parameters and scan them
