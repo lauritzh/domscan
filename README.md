@@ -58,6 +58,10 @@ Options:
                                  allowed)                                [array]
   -l, --localStorage             Specify localStorage entries (multiple values
                                  allowed)                                [array]
+  -m, --manualLogin              Launch an interactive Browser Session prior
+                                 Scan which enables to manually perform
+                                 bootstrapping such as logging in, requires
+                                 "--headless false"                    [boolean]
   -h, --help                     Show help                             [boolean]
 
 Please provide a URL.
@@ -66,12 +70,17 @@ Please provide a URL.
 **Examples**:    
 Interactive scan with parameter guessing and custom user agent, pauses after each payload and waits for user input:
 ```console
-$ domscan -g -G "https://lhq.at/?test=Test" --headless false --interactive --cookies "session_id=test123" --excludeFromConsole "Tracking Event:"
+$ domscan -g -G "https://lhq.at/?test=Test" --headless false --interactive --cookies "session_id=test123" --excludeFromConsole --userAgent "domscan" "Tracking Event:"
 ```
 
 Non-interactive scan with parameter guessing:
 ```console
 $ domscan -g -G "https://lhq.at/?test=Test"
+```
+
+Manually log in prior to the scan run - this opens an interactive browser window and allows to use the normal login flow (without setting specific cookies or local storage values):
+```console
+$ domscan "https://lhq.at/?test=Test" --manualLogin --headless false
 ```
 
 At the moment, DOMscan only supports one URL per scan. If you want to scan multiple URLs from a text file, you can circumvent this limitation using Bash as follows:

@@ -85,6 +85,11 @@ const argv = yargs
     describe: 'Specify localStorage entries (multiple values allowed)',
     array: true
   })
+  .option('manualLogin', {
+    alias: 'm',
+    describe: 'Launch an interactive Browser Session prior Scan which enables to manually perform bootstrapping such as logging in, requires "--headless false"',
+    type: 'boolean'
+  })
   .demandCommand(1, 'Please provide a URL.')
   .help()
   .alias('help', 'h')
@@ -534,6 +539,17 @@ async function main () {
   await client.send('Network.enable')
   await client.send('Network.setCacheDisabled', { cacheDisabled: true })
 
+  if (argv.manualLogin) {
+    if (argv.headless) {
+      console.error('Error: --manualLogin can only be used if --headless is set to "false".')
+      process.exit(1)
+    }
+    printColorful('white', '[!] Manual Login: Perform any actions such as login, manually set cookies, ... and launch scan afterwards. Press ENTER to start scan.')
+    await page.goto(url)
+    await waitForAnyInput()
+    await page.goto('about:blank')
+  }
+
   if (argv.throttle) {
     printColorful('green', '[+] Throttling connection to 1 MBit/s...')
     await client.send('Network.emulateNetworkConditions', {
@@ -740,8 +756,6 @@ async function main () {
   await registerAnalysisListeners(page, client)
   await scanParameterOrFragment(page, true)
   await clearPageEventListeners(page)
-
-  // TODO: Parse location.hash for parameters and scan them
 
   // Cleanup
   await browser.close()
