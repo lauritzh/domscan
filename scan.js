@@ -25,7 +25,7 @@ console.log(art)
 
 // Define the command-line interface
 const argv = yargs
-  .version('v0.0.3')
+  .version('v0.0.4')
   .option('verbose', {
     alias: 'v',
     describe: 'Enable verbose output',
