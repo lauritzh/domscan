@@ -25,7 +25,7 @@ console.log(art)
 
 // Define the command-line interface
 const argv = yargs
-  .version('v0.0.3')
+  .version('v0.0.4')
   .option('verbose', {
     alias: 'v',
     describe: 'Enable verbose output',
@@ -85,6 +85,11 @@ const argv = yargs
     describe: 'Specify localStorage entries (multiple values allowed)',
     array: true
   })
+  .option('manualLogin', {
+    alias: 'm',
+    describe: 'Launch an interactive Browser Session prior Scan which enables to manually perform bootstrapping such as logging in, requires "--headless false"',
+    type: 'boolean'
+  })
   .demandCommand(1, 'Please provide a URL.')
   .help()
   .alias('help', 'h')
@@ -96,6 +101,7 @@ const marker = Math.random().toString(32).substring(2, 10)
 payloads = payloads.map(payload => payload.replace('MARKER', marker))
 
 const parameters = {}
+const fragmentParameters = {}
 let guessedParameters = []
 
 const initialPageLoadConsoleMessages = []
@@ -103,8 +109,8 @@ const initialPageLoadRequestfailed = []
 const initialPageLoadPageErrors = []
 const findings = {}
 let currentUrl = url
-let currentParameter = ''
 let currentPayload = ''
+let currentParameter = ''
 let redirectedForParameter = false
 
 // Helper functions
@@ -121,7 +127,22 @@ function parseUrlParameters () {
     }
     printColorful('green', '[+] URL Parameters: ' + JSON.stringify(parameters))
   } else {
-    printColorful('red', '[!] No URL parameters found. If you do not intent to only guess parameters (see help), please provide an URL that already includes GET parameters.')
+    printColorful('red', '[!] No URL or hash parameters found. If you do not intent to only guess parameters (see help), please provide an URL that already includes GET parameters.')
+  }
+  if (url.hash !== undefined && (url.hash.includes('?'))) {
+    const fragmentParamsTemp = new URLSearchParams(url.hash.slice(url.hash.indexOf('?') + 1))
+    if (fragmentParamsTemp.entries().next().value !== undefined) {
+      for (const [key, value] of fragmentParamsTemp.entries()) {
+        if (fragmentParameters[key] === undefined) {
+          fragmentParameters[key] = value
+        } else if (Array.isArray(fragmentParameters[key]) === false) {
+          fragmentParameters[key] = [fragmentParameters[key], value]
+        } else {
+          fragmentParameters[key].push(value)
+        }
+      }
+      printColorful('green', '[+] Fragment (#) Parameters: ' + JSON.stringify(parameters))
+    }
   }
 }
 
@@ -142,22 +163,22 @@ async function initialPageLoad (page) {
   page.on('response', response => {
     // Detect immediate redirects
     if ([301, 302, 303, 307].includes(response.status())) {
-      printColorful('red', `[+] Found redirect, could indicate erroneous initial URL or missing cookies: ${response.status()} ${response.url()}`)
+      printColorful('red', `[!] Found redirect, could indicate erroneous initial URL or missing cookies: ${response.status()} ${response.url()}`)
     }
   })
   // Register listener for console messages
   page.on('console', message => {
-    if (argv.verbose) printColorful('turquoise', `[+] Console Message: ${message.text()}`)
+    if (argv.verbose) printColorful('yellow', `[*] Console Message: ${message.text()}`)
     initialPageLoadConsoleMessages.push(message)
   }).on('pageerror', ({ message }) => {
-    if (argv.verbose) printColorful('turquoise', `[+] Page Error: ${message}`)
+    if (argv.verbose) printColorful('red', `[!] Page Error: ${message}`)
     initialPageLoadPageErrors.push(message)
   }).on('requestfailed', request => {
-    if (argv.verbose) printColorful('turquoise', `[+] Request Failed: ${request.url()}`)
+    if (argv.verbose) printColorful('red', `[!] Request Failed: ${request.url()}`)
     initialPageLoadRequestfailed.push(request)
   })
 
-  if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load')
+  if (argv.verbose) printColorful('green', '[+] Initial Page Load')
   // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
   // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
   await page.goto(url, { waitUntil: 'networkidle2' })
@@ -166,7 +187,7 @@ async function initialPageLoad (page) {
     window.waitedUntilJSExecuted = true
   })
   await page.waitForFunction('window.waitedUntilJSExecuted === true')
-  if (argv.verbose) printColorful('turquoise', '[+] Initial Page Load Complete')
+  if (argv.verbose) printColorful('green', '[+] Initial Page Load Complete')
 }
 
 /**
@@ -242,10 +263,10 @@ async function registerAnalysisListeners (page, client) {
   })
   await page.on('response', response => {
     if (response.status() >= 400) {
-      printColorful('yellow', `  [+] Found error: ${response.status()} ${response.url()}`)
+      printColorful('red', `  [!] Found error: ${response.status()} ${response.url()}`)
     }
   }).on('console', message => {
-    if (argv.verbose) printColorful('turquoise', `[+] Console Message for Payload ${currentPayload}: ${message.text()}`)
+    if (argv.verbose) printColorful('green', `[+] Console Message for Payload ${currentPayload}: ${message.text()}`)
     if (initialPageLoadConsoleMessages.includes(message) === false) {
       // Highlight findings that likely can be exploited
       if (argv.excludeFromConsole) {
@@ -264,23 +285,24 @@ async function registerAnalysisListeners (page, client) {
       }
     }
   }).on('pageerror', ({ message }) => {
-    if (argv.verbose) printColorful('turquoise', `[+] Page Error for Payload ${currentPayload}: ${message}`)
+    if (argv.verbose) printColorful('red', `[!] Page Error for Payload ${currentPayload}: ${message}`)
     if (initialPageLoadPageErrors.includes(message) === false) {
-      printColorful('yellow', `  [+] New Page Error for Payload ${currentPayload} in Param ${currentParameter}: ${message}`)
+      printColorful('red', `  [!] New Page Error for Payload ${currentPayload} in Param ${currentParameter}: ${message}`)
     }
   }).on('requestfailed', request => {
-    if (argv.verbose) printColorful('turquoise', `[+] Request Failed: ${request.url()}`)
+    if (argv.verbose) printColorful('red', `[!] Request Failed: ${request.url()}`)
     if (initialPageLoadRequestfailed.includes(request) === false) {
-      if (argv.verbose) printColorful('yellow', `  [+] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
+      if (argv.verbose) printColorful('yellow', `  [*] New Request Failed for Payload ${currentPayload} in Param ${currentParameter}: ${request.url()} - ${request.failure().errorText}`)
     }
   })
 }
 
 /**
  * @param {Object} page - The puppeteer page Object
+ * @param {bool} fragment - Determine whether the query string or fragment should be scanned
  * @param {string} parameter - The parameter to be scanned
  */
-async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
+async function scanParameterOrFragment (page, fragment = false, parameter = 'URL-FRAGMENT') {
   let markerFound = false
   currentParameter = parameter
   await page.on('response', response => {
@@ -290,18 +312,22 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
     }
   })
 
-  if (argv.verbose) printColorful('turquoise', `[+] Starting Scan for Parameter: ${parameter}`)
+  if (argv.verbose) printColorful('green', `[+] Starting Scan for Parameter: ${parameter}`)
   for (const payload of payloads) {
     // Craft URL
     currentPayload = payload
-    if (argv.verbose) printColorful('turquoise', `[+] Testing Payload: ${payload}`)
+    if (argv.verbose) printColorful('green', `[+] Testing Payload: ${payload}`)
     const urlTemp = new URL(argv._[0]) // Create a new URL object to avoid side effects such as appending the payload multiple times
-    if (parameter === 'URL-FRAGMENT') {
+    if (fragment === true && parameter === 'URL-FRAGMENT') { // Directly inject payload to fragment
       urlTemp.hash = payload
-    } else {
+    } else if (fragment === true) { // Set payload in URL fragment parameter
+      const fragmentParamsTemp = new URLSearchParams(urlTemp.hash.slice(urlTemp.hash.indexOf('?') + 1))
+      fragmentParamsTemp.set(parameter, payload)
+      urlTemp.hash = url.hash.substring(0, urlTemp.hash.indexOf('?') + 1) + fragmentParamsTemp.toString()
+    } else { // Set payload in query parameter
       urlTemp.searchParams.set(parameter, payload)
     }
-    if (argv.verbose) printColorful('turquoise', `[+] Resulting URL: ${urlTemp}`)
+    if (argv.verbose) printColorful('green', `[+] Resulting URL: ${urlTemp}`)
     currentUrl = urlTemp
 
     // Navigate to URL
@@ -309,9 +335,13 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
       // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
       // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
       await page.goto(urlTemp, { waitUntil: 'networkidle2' })
+      if (fragment) page.reload()
       await page.waitForFunction(() => document.readyState === 'complete')
+      await page.evaluate(async () => {
+        window.waitedUntilJSExecuted = true
+      })
     } catch (e) {
-      printColorful('red', `[+] Error during page load: ${e}`)
+      printColorful('red', `[!] Error during page load: ${e}`)
     }
     // Search for marker in document, only search once per parameter to reduce noise
     if (!markerFound) {
@@ -324,10 +354,10 @@ async function scanParameterOrFragment (page, parameter = 'URL-FRAGMENT') {
           addFinding('marker-reflected', 'info')
         }
       } catch (e) {
-        printColorful('red', `[+] Error during page evaluation for Marker search: ${e}`)
+        printColorful('red', `[!] Error during page evaluation for Marker search: ${e}`)
       }
     }
-    if (argv.verbose || argv.interactive) printColorful('white', `[+] Tested payload "${currentPayload}" in Parameter "${parameter}"`)
+    if (argv.verbose || argv.interactive) printColorful('green', `[+] Tested payload "${currentPayload}" in Parameter "${parameter}"`)
     if (argv.interactive) {
       await waitForAnyInput()
     }
@@ -340,7 +370,7 @@ function waitForAnyInput () {
       input: process.stdin,
       output: process.stdout
     })
-    rl.question('Press any key to continue...', () => {
+    rl.question('Press ENTER to continue...', () => {
       rl.close()
       resolve()
     })
@@ -473,9 +503,9 @@ process.on('uncaughtException', (err) => {
 async function main () {
   // Display the parsed options and URL
   if (argv.verbose) {
-    printColorful('turquoise', `Options: ${JSON.stringify(argv)}`)
+    printColorful('green', `[+] Options: ${JSON.stringify(argv)}`)
   }
-  printColorful('green', `URL: ${url}`)
+  printColorful('green', `[+] URL: ${url}`)
 
   // Parse URL parameters
   parseUrlParameters()
@@ -491,7 +521,7 @@ async function main () {
     }
     payloads = [...new Set(payloads)] // Remove duplicates
   }
-  if (argv.verbose) printColorful('turquoise', `Payloads: ${JSON.stringify(payloads)}`)
+  if (argv.verbose) printColorful('green', `[+] Payloads: ${JSON.stringify(payloads)}`)
 
   // Start the browser
   printColorful('green', '[+] Starting browser...')
@@ -500,7 +530,7 @@ async function main () {
     printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
     options.args = []
     options.args.push(`--proxy-server=${argv.proxy}`)
-    printColorful('yellow', '  [+] Disabling Certificate Validation...')
+    printColorful('green', '  [+] Disabling Certificate Validation...')
     options.args.push('--ignore-certificate-errors')
   }
   const browser = await pt.launch(options)
@@ -508,6 +538,19 @@ async function main () {
   const client = await page.target().createCDPSession()
   await client.send('Network.enable')
   await client.send('Network.setCacheDisabled', { cacheDisabled: true })
+
+  if (argv.manualLogin) {
+    if (argv.headless) {
+      console.error('Error: --manualLogin can only be used if --headless is set to "false".')
+      process.exit(1)
+    }
+    printColorful('white', '[!] Manual Login: Perform any actions such as login, manually set cookies, ... and launch scan afterwards. Press ENTER to start scan.')
+    // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
+    // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
+    await page.goto(url)
+    await waitForAnyInput()
+    await page.goto('about:blank')
+  }
 
   if (argv.throttle) {
     printColorful('green', '[+] Throttling connection to 1 MBit/s...')
@@ -522,7 +565,7 @@ async function main () {
   // Set user agent
   if (argv.userAgent) {
     printColorful('green', '[+] Setting user agent...')
-    if (argv.verbose) printColorful('turquoise', `[+] User Agent: ${argv.userAgent}`)
+    if (argv.verbose) printColorful('green', `[+] User Agent: ${argv.userAgent}`)
     await page.setUserAgent(argv.userAgent)
   }
 
@@ -539,7 +582,7 @@ async function main () {
   await page.exposeFunction('domscan', (parameter, message) => {
     if (!guessedParameters.includes(parameter)) {
       guessedParameters.push(parameter)
-      printColorful('yellow', `  [+] ${message}`)
+      printColorful('yellow', `  [*] ${message}`)
     }
   })
 
@@ -550,7 +593,7 @@ async function main () {
     if (typeof argv.cookies === 'string') {
       argv.cookies = [argv.cookies]
     }
-    if (argv.verbose) printColorful('turquoise', `[+] Cookies: ${JSON.stringify(argv.cookies)}`)
+    if (argv.verbose) printColorful('green', `[+] Cookies: ${JSON.stringify(argv.cookies)}`)
     const preparedCookies = argv.cookies.map(cookie => {
       return {
         name: cookie.split('=')[0],
@@ -569,10 +612,13 @@ async function main () {
   if (argv.localStorage !== undefined) {
     printColorful('green', '[+] Setting local storage...')
     if (argv.verbose) printColorful('turquoise', '[+] Local Storage: ' + JSON.stringify(argv.localStorage))
+    if (typeof argv.localStorage === 'string') {
+      argv.localStorage = [argv.localStorage]
+    }
     argv.localStorage.forEach(item => {
       // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
       // nosemgrep javascript.puppeteer.security.audit.puppeteer-evaluate-arg-injection.puppeteer-evaluate-arg-injection
-      page.evaluate((item) => {
+      page.evaluateOnNewDocument((item) => {
         try {
           localStorage.setItem(item.split('=')[0], item.split('=')[1])
         } catch (e) {
@@ -582,13 +628,13 @@ async function main () {
     })
   }
 
-  if (argv.verbose) printColorful('turquoise', '[+] Enable Request Interception')
+  if (argv.verbose) printColorful('green', '[+] Enable Request Interception')
   await page.setRequestInterception(true)
 
   // Request Interception - This listener can be registered once
-  if (argv.verbose) printColorful('turquoise', '[+] Register Request Interception')
+  if (argv.verbose) printColorful('green', '[+] Register Request Interception')
   page.on('request', async request => {
-    if (argv.verbose) printColorful('turquoise', `[+] Intercepted Request: ${request.url()}`)
+    if (argv.verbose) printColorful('green', `[+] Intercepted Request: ${request.url()}`)
     // Intercept requests
     //   Search for marker in URL but ignore the initial page load where we set the marker ourselves
     if (request.url().includes(marker) && request.url() !== currentUrl.href) {
@@ -650,9 +696,9 @@ async function main () {
       printColorful('green', `[+] Scanning parameter: ${parameter}`)
       await registerAnalysisListeners(page, client)
       try {
-        await scanParameterOrFragment(page, parameter)
+        await scanParameterOrFragment(page, false, parameter)
       } catch (e) {
-        printColorful('yellow', `  [+] Error during scan of parameter ${parameter}: ${e}`)
+        printColorful('red', `  [!] Error during scan of parameter ${parameter}: ${e}`)
       }
       await clearPageEventListeners(page)
     }
@@ -676,25 +722,42 @@ async function main () {
           printColorful('green', `[+] Scanning parameter: ${parameter}`)
           await registerAnalysisListeners(page, client)
           try {
-            await scanParameterOrFragment(page, parameter)
+            await scanParameterOrFragment(page, false, parameter)
           } catch (e) {
-            printColorful('red', `[+] Error during scan of parameter ${parameter}: ${e}`)
+            printColorful('red', `[!] Error during scan of parameter ${parameter}: ${e}`)
           }
           await clearPageEventListeners(page)
         }
       }
     }
   } else {
-    printColorful('green', '[+] No parameters to scan.')
+    printColorful('red', '[+] No parameters to scan.')
+  }
+
+  // Scan URL Fragment parameters
+  if (fragmentParameters) {
+    printColorful('green', '[+] Scanning URL fragment parameters for injections...')
+    for (const parameter in fragmentParameters) {
+      if (argv.excludedParameter && argv.excludedParameter.includes(parameter)) {
+        printColorful('green', `[+] Skipping excluded parameter: ${parameter}`)
+        continue
+      }
+      printColorful('green', `[+] Scanning parameter: ${parameter}`)
+      await registerAnalysisListeners(page, client)
+      try {
+        await scanParameterOrFragment(page, true, parameter)
+      } catch (e) {
+        printColorful('yellow', `  [+] Error during scan of parameter ${parameter}: ${e}`)
+      }
+      await clearPageEventListeners(page)
+    }
   }
 
   // Scan URL fragments
   printColorful('green', '[+] Scanning URL fragment for injections...')
   await registerAnalysisListeners(page, client)
-  await scanParameterOrFragment(page)
+  await scanParameterOrFragment(page, true)
   await clearPageEventListeners(page)
-
-  // TODO: Parse location.hash for parameters and scan them
 
   // Cleanup
   await browser.close()
