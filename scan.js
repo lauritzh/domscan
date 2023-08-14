@@ -545,6 +545,8 @@ async function main () {
       process.exit(1)
     }
     printColorful('white', '[!] Manual Login: Perform any actions such as login, manually set cookies, ... and launch scan afterwards. Press ENTER to start scan.')
+    // Excluded from Semgrep: https://github.com/lauritzh/domscan#security-considerations
+    // nosemgrep javascript.puppeteer.security.audit.puppeteer-goto-injection.puppeteer-goto-injection
     await page.goto(url)
     await waitForAnyInput()
     await page.goto('about:blank')
