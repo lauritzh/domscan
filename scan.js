@@ -91,7 +91,7 @@ const argv = yargs
     describe: 'Launch an interactive Browser Session prior Scan which enables to manually perform bootstrapping such as logging in, requires "--headless false"',
     type: 'boolean'
   })
-  .option('nosandbox', {//Add No-Sandbox option
+  .option('nosandbox', {
     alias: '-no-sandbox',
     default: false,
     describe: 'Launch Chromium without sandbox',
@@ -520,7 +520,7 @@ async function main () {
 
   // Add mutations of URL parameter values to the payload list
   printColorful('green', '[+] Adding mutations of given URL parameter values to payload list...')
-  if (parameters !== {}) {
+  if (Object.keys(parameters).length !== 0) {
     for (const parameter in parameters) {
       for (const value of parameters[parameter]) {
         payloads.push(value + marker)
@@ -536,17 +536,17 @@ async function main () {
   const options = { headless: argv.headless ? 'new' : false }
 
   if (argv.proxy) {
-      printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
-      options.args = options.args || [];  // Ensure args is initialized
-      options.args.push(`--proxy-server=${argv.proxy}`)
-      printColorful('green', '  [+] Disabling Certificate Validation...')
-      options.args.push('--ignore-certificate-errors')
+    printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
+    options.args = options.args || [] // Ensure args is initialized
+    options.args.push(`--proxy-server=${argv.proxy}`)
+    printColorful('green', '  [+] Disabling Certificate Validation...')
+    options.args.push('--ignore-certificate-errors')
   }
- //Add No-Sandbox option
+  // Add No-Sandbox option
   if (argv.nosandbox) {
-      options.args = options.args || [];  // Ensure args is initialized
-      options.args.push('--no-sandbox');
-      printColorful('green', '  [+] Launching without sandbox...');
+    options.args = options.args || [] // Ensure args is initialized
+    options.args.push('--no-sandbox')
+    printColorful('green', '  [+] Launching without sandbox...')
   }
 
   const browser = await pt.launch(options)
@@ -719,7 +719,7 @@ async function main () {
   }
 
   // Scan parameters
-  if (parameters !== {}) {
+  if (Object.keys(parameters).length !== 0) {
     printColorful('green', '[+] Scanning parameters...')
 
     for (const parameter in parameters) {
