@@ -550,8 +550,6 @@ async function main () {
   }
 
   const browser = await pt.launch(options)
-  
-  //const browser = await pt.launch(options)
   const page = await browser.newPage()
   const client = await page.target().createCDPSession()
   await client.send('Network.enable')
