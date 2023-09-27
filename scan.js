@@ -38,7 +38,7 @@ const argv = yargs
   })
   .option('guessParameters', {
     alias: 'g',
-    describe: 'Enable parameter guessing based on URLSearchParams',
+    describe: 'Enable parameter guessing based on URLSearchParams and input field names',
     type: 'boolean'
   })
   .option('throttle', {
@@ -91,7 +91,7 @@ const argv = yargs
     describe: 'Launch an interactive Browser Session prior Scan which enables to manually perform bootstrapping such as logging in, requires "--headless false"',
     type: 'boolean'
   })
-  .option('nosandbox', {//Add No-Sandbox option
+  .option('nosandbox', {
     alias: '-no-sandbox',
     default: false,
     describe: 'Launch Chromium without sandbox',
@@ -520,7 +520,7 @@ async function main () {
 
   // Add mutations of URL parameter values to the payload list
   printColorful('green', '[+] Adding mutations of given URL parameter values to payload list...')
-  if (parameters !== {}) {
+  if (Object.keys(parameters).length !== 0) {
     for (const parameter in parameters) {
       for (const value of parameters[parameter]) {
         payloads.push(value + marker)
@@ -536,17 +536,17 @@ async function main () {
   const options = { headless: argv.headless ? 'new' : false }
 
   if (argv.proxy) {
-      printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
-      options.args = options.args || [];  // Ensure args is initialized
-      options.args.push(`--proxy-server=${argv.proxy}`)
-      printColorful('green', '  [+] Disabling Certificate Validation...')
-      options.args.push('--ignore-certificate-errors')
+    printColorful('green', `[+] Setting proxy to ${argv.proxy}...`)
+    options.args = options.args || [] // Ensure args is initialized
+    options.args.push(`--proxy-server=${argv.proxy}`)
+    printColorful('green', '  [+] Disabling Certificate Validation...')
+    options.args.push('--ignore-certificate-errors')
   }
- //Add No-Sandbox option
+  // Add No-Sandbox option
   if (argv.nosandbox) {
-      options.args = options.args || [];  // Ensure args is initialized
-      options.args.push('--no-sandbox');
-      printColorful('green', '  [+] Launching without sandbox...');
+    options.args = options.args || [] // Ensure args is initialized
+    options.args.push('--no-sandbox')
+    printColorful('green', '  [+] Launching without sandbox...')
   }
 
   const browser = await pt.launch(options)
@@ -664,7 +664,6 @@ async function main () {
   /* global domscan */
   if (argv.guessParameters) {
     await page.evaluateOnNewDocument(async () => {
-      // Hook URLSearchParams: URLSearchParams.prototype.get = function() { alert(arguments[0]) }
       URLSearchParams.prototype.has = new Proxy(URLSearchParams.prototype.has, {
         apply: function (target, thisArg, argumentsList) {
           domscan(argumentsList[0], `URLSearchParams.has() is called on ${argumentsList[0]}`)
@@ -687,7 +686,26 @@ async function main () {
   await clearPageEventListeners(page)
 
   // Guess parameters
-  // TODO: Implement better parameter guessing (based on wordlist, use cache buster, determine additional parameters from JS code, etc.)
+  if (argv.guessParameters) {
+    // Search for input fields with names
+    const parametersFromInputFields = await page.evaluate(async () => {
+      console.log(document.getElementsByTagName('input'))
+      const inputNames = []
+      Array.from(document.getElementsByTagName('input')).forEach((item) => {
+        console.log(item)
+        inputNames.push(item.name)
+      })
+      return inputNames
+    })
+    if (parametersFromInputFields.length > 0) {
+      printColorful('green', `[+] Guessed Parameters from Input Fields: ${JSON.stringify(parametersFromInputFields)}`)
+      for (const parameter of parametersFromInputFields) {
+        if (parameters[parameter] === undefined) {
+          parameters[parameter] = marker
+        }
+      }
+    }
+  }
   if (argv.guessParametersExtended) {
     await guessParametersExtended(page)
   }
@@ -701,7 +719,7 @@ async function main () {
   }
 
   // Scan parameters
-  if (parameters !== {}) {
+  if (Object.keys(parameters).length !== 0) {
     printColorful('green', '[+] Scanning parameters...')
 
     for (const parameter in parameters) {
