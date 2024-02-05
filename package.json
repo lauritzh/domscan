@@ -12,7 +12,7 @@
     "domscan": "./scan.js"
   },
   "dependencies": {
-    "puppeteer": "^21.0.3",
+    "puppeteer": "^22.0.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
